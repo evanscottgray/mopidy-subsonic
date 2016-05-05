@@ -7,11 +7,11 @@ import logging
 import libsonic
 import time
 import re
-from datetime import datetime
 
 from mopidy.models import Track, Album, Artist, Playlist
 
 logger = logging.getLogger(__name__)
+
 
 ##
 # Forces hashes into lists
@@ -22,27 +22,30 @@ def makelist(x):
     else:
         return [x]
 
+
 ##
 # Unescapes all the unicode values in a query return value
 #
 def unescapeobj(obj):
     return apply_to_struct(obj, unescape, unicode)
 
+
 def apply_to_struct(obj, f, t):
     if isinstance(obj, dict):
         newdict = {}
-        for key,val in obj.iteritems():
+        for key, val in obj.iteritems():
             newdict[key] = apply_to_struct(val, f, t)
         return newdict
-    elif isinstance(obj,list):
+    elif isinstance(obj, list):
         newlist = []
         for val in obj:
             newlist.append(apply_to_struct(val, f, t))
         return newlist
-    elif isinstance(obj,t):
+    elif isinstance(obj, t):
         return f(obj)
     else:
         return obj
+
 
 ##
 # Removes HTML or XML character references and entities from a text string.
@@ -62,8 +65,9 @@ def unescape(text):
                     return unichr(int(text[2:-1]))
             except ValueError:
                 pass
-        return text # leave as is
+        return text  # leave as is
     return re.sub("&#?\w+;", fixup, text)
+
 
 class cache(object):
     # TODO: merge this to util library
@@ -97,19 +101,21 @@ class cache(object):
                 return self.func(*args)
         return _memoized
 
+
 class SubsonicRemoteClient(object):
 
     def __init__(self, hostname, port, username, password, ssl, context):
         super(SubsonicRemoteClient, self).__init__()
 
         if not (hostname and port and username and password):
-            logger.error('Subsonic API settings are not fully defined: %s %s %s %s %s' % (hostname, port, username, password, ssl))
+            er = 'Subsonic API settings are not fully defined: %s %s %s %s %s'
+            logger.error(er % (hostname, port, username, password, ssl))
         else:
             self.api_hostname = hostname
             self.api_port = port
             self.api_user = username
             self.api_pass = password
-            if ssl: 
+            if ssl:
                 self.api_hostname = "https://" + hostname
             else:
                 self.api_hostname = "http://" + hostname
@@ -118,8 +124,14 @@ class SubsonicRemoteClient(object):
             else:
                 self.api_context = "/rest"
 
-            self.api = libsonic.Connection(self.api_hostname, self.api_user, self.api_pass, port=int(self.api_port), serverPath=self.api_context)
-            logger.info('Connecting to Subsonic library %s:%s as user %s', self.api_hostname, self.api_port, self.api_user)
+            self.api = libsonic.Connection(self.api_hostname, self.api_user,
+                                           self.api_pass,
+                                           port=int(self.api_port),
+                                           serverPath=self.api_context)
+
+            base_msg = 'Connecting to Subsonic library: %s:%s as user %s'
+            msg = base_msg % (self.api_hostname, self.api_port, self.api_user)
+            logger.info(msg)
             try:
                 self.api.ping()
             except Exception as e:
@@ -130,10 +142,13 @@ class SubsonicRemoteClient(object):
     def get_artists(self):
         try:
             # get the artist indexes (segmented by a,b,c,...)
-            indexes = unescapeobj(self.api.getIndexes().get('indexes').get('index'))
+            raw_index = self.api.getIndexes().get('indexes').get('index')
+            indexes = unescapeobj(raw_index)
 
-            # for each index, get it's artists out, turn them into tracks, and return those tracks
-            return [self.get_track(artist) for index in indexes for artist in makelist(index.get('artist'))]
+            # for each index, get it's artists out, turn them into tracks,
+            # and return those tracks
+            return [self.get_track(artist) for index in
+                    indexes for artist in makelist(index.get('artist'))]
         except Exception as error:
             logger.debug('Failed in get_artists: %s' % error)
             return []
@@ -143,9 +158,10 @@ class SubsonicRemoteClient(object):
         artist_tracks = self.get_artists()
 
         for track in artist_tracks:
-            artist = next(iter(track.artists)) #unpack the frozenset
+            artist = next(iter(track.artists))  # unpack the frozenset
             if (artist.name == artist_query):
-                return int(''.join(x for x in track.uri if x.isdigit())) # pull the id number from the URI
+                # pull the id number from the URI
+                return int(''.join(x for x in track.uri if x.isdigit()))
         return None
 
     @cache()
@@ -153,7 +169,8 @@ class SubsonicRemoteClient(object):
         try:
             if not id:
                 return []
-            return unescapeobj(self.api.getMusicDirectory(id).get('directory').get('child'))
+            dr = self.api.getMusicDirectory(id).get('directory').get('child')
+            return unescapeobj(dr)
         except Exception as error:
             logger.debug('Failed in id_to_dir: %s' % error)
             return []
@@ -170,7 +187,7 @@ class SubsonicRemoteClient(object):
 
         albums = []
         for dir in dirs:
-            if dir != None:
+            if dir is not None:
                 if dir.get('album'):
                     albums.append(dir)
                 else:
@@ -185,7 +202,7 @@ class SubsonicRemoteClient(object):
         if artist_query:
             q_artist = next(iter(artist_query))
         if album_query:
-            q_album  = next(iter(album_query))
+            q_album = next(iter(album_query))
 
         artist_id = self.get_artist_id(q_artist)
         albums = makelist(self.id_to_albums(artist_id))
@@ -197,7 +214,7 @@ class SubsonicRemoteClient(object):
                     tracks.extend(self.album_to_tracks(album))
             else:
                 album = self.album_to_tracks(album)
-                album = [x for x in album if x != None]
+                album = [x for x in album if x is not None]
                 tracks.extend(album)
 
         return tracks
@@ -214,7 +231,7 @@ class SubsonicRemoteClient(object):
 
     @cache(ctl=16)
     def get_track(self, data):
-        track = self._convert_data(data) 
+        track = self._convert_data(data)
         return track
 
     def _convert_data(self, data):
@@ -244,7 +261,7 @@ class SubsonicRemoteClient(object):
             albumartist_kwargs['name'] = data['albumartist']
 
         if 'album' in data:
-            album_kwargs['name'] = unicode(data['album']).replace('"','\\"')
+            album_kwargs['name'] = unicode(data['album']).replace('"', '\\"')
 
         if 'title' in data:
             track_kwargs['name'] = data['title']
@@ -276,18 +293,20 @@ class SubsonicRemoteClient(object):
         return track
 
     def build_url_from_song_id(self, id):
-        uri="%s:%d/%s/%s?id=%s&u=%s&p=%s&c=mopidy&v=1.8" % (self.api._baseUrl,
-                                                            self.api._port,
-                                                            self.api._serverPath,
-                                                            'stream.view',
-                                                            id,
-                                                            self.api._username,
-                                                            self.api._rawPass)
+        base_uri = '%s:%d/%s/%s?id=%s&u=%s&p=%s&c=mopidy&v=1.8'
+        uri = base_uri % (self.api._baseUrl,
+                          self.api._port,
+                          self.api._serverPath,
+                          'stream.view',
+                          id,
+                          self.api._username,
+                          self.api._rawPass)
         return uri
 
     def search_artist(self, artist):
         artist_set = set()
-        results = unescapeobj(self.api.search2(artist,100,0,0,0,0,0).get('searchResult2'))
+        sr = self.api.search2(artist, 100, 0, 0, 0, 0, 0).get('searchResult2')
+        results = unescapeobj(sr)
 
         if 'artist' in results:
             for artist in makelist(results.get('artist')):
@@ -298,7 +317,8 @@ class SubsonicRemoteClient(object):
 
     def search_album(self, album):
         album_set = set()
-        results = unescapeobj(self.api.search2(album,0,0,100,0,0,0).get('searchResult2'))
+        sr = self.api.search2(album, 0, 0, 100, 0, 0, 0).get('searchResult2')
+        results = unescapeobj(sr)
 
         if 'album' in results:
             for album in makelist(results.get('album')):
@@ -307,20 +327,22 @@ class SubsonicRemoteClient(object):
 
     def search_title(self, title):
         title_set = set()
-        results = unescapeobj(self.api.search2(title,0,0,0,0,1000,0).get('searchResult2'))
+        sr = self.api.search2(title, 0, 0, 0, 0, 1000, 0).get('searchResult2')
+        results = unescapeobj(sr)
 
         if 'song' in results:
-            title_set = set([self.get_track(song) for song in makelist(results.get('song'))])
+            title_set = set([self.get_track(song) for song in
+                             makelist(results.get('song'))])
         return title_set
 
     def search_any(self, any):
         artist_set = self.search_artist(any)
-        album_set  = self.search_album(any)
-        title_set  = self.search_title(any)
+        album_set = self.search_album(any)
+        title_set = self.search_title(any)
         return artist_set | album_set | title_set
 
     def search_tracks(self, artist, album, title, any):
-        any_set,artist_set,album_set,title_set = set(),set(),set(),set()
+        any_set, artist_set, album_set, title_set = set(), set(), set(), set()
 
         if any is not None:
             any_set = self.search_any(any)
@@ -333,47 +355,54 @@ class SubsonicRemoteClient(object):
 
         final_set = set()
         if any is not None:
-            final_set = any_set    if not final_set else (final_set & any_set)
+            final_set = any_set if not final_set else (final_set & any_set)
         if artist is not None:
-            final_set = artist_set if not final_set else (final_set & artist_set)
+            final_set = artist_set if not final_set else \
+                        (final_set & artist_set)
         if album is not None:
-            final_set = album_set  if not final_set else (final_set & album_set)
+            final_set = album_set if not final_set else (final_set & album_set)
         if title is not None:
-            final_set = title_set   if not final_set else (final_set & title_set)
+            final_set = title_set if not final_set else (final_set & title_set)
 
         final_list = list(final_set)
-        final_list.sort(key=lambda x: (next(iter(x.artists)).name, x.album.name, x.track_no))
+        final_list.sort(key=lambda x: (next(iter(x.artists)).name,
+                        x.album.name, x.track_no))
 
         return final_list
 
     # MPD doesn't like /, \n, or \r in names
     # should only necessary until next release of mopidy
     def fix_playlist_name(self, name):
-        _invalid_playlist_chars = re.compile(r'[\n\r/]') 
+        _invalid_playlist_chars = re.compile(r'[\n\r/]')
         fixed_name = _invalid_playlist_chars.sub('-', name)
-        return fixed_name 
+        return fixed_name
 
     def get_user_playlists(self):
         results = self.api.getPlaylists().get('playlists')
         if results is u'':
             return []
         else:
-            results = makelist(unescapeobj(self.api.getPlaylists().get('playlists').get('playlist')))
-            return [Playlist(uri=u'subsonic://%s' % playlist.get('id'),
-                         name='User Playlist: %s' % self.fix_playlist_name(playlist.get('name')))
-                         for playlist in results]
+            pl = self.api.getPlaylists().get('playlists').get('playlist')
+            results = makelist(unescapeobj(pl))
+            return [Playlist(uri=u'subsonic://%s' % p.get('id'),
+                    name='User Playlist: %s' %
+                    self.fix_playlist_name(p.get('name')))
+                    for p in results]
 
     def playlist_id_to_playlist(self, id):
-        playlist = unescapeobj(self.api.getPlaylist(id).get('playlist'))
-        songs = playlist.get('entry')
-        return Playlist(uri=u'subsonic://%s' % playlist.get('id'),
-                        name='User Playlist: %s' % self.fix_playlist_name(playlist.get('name')),
-                        tracks=[self.get_track(song) for song in makelist(songs)])
+        pl = unescapeobj(self.api.getPlaylist(id).get('playlist'))
+        songs = pl.get('entry')
+        return Playlist(uri=u'subsonic://%s' % pl.get('id'),
+                        name='User Playlist: %s' %
+                        self.fix_playlist_name(pl.get('name')),
+                        tracks=[self.get_track(song) for song in
+                                makelist(songs)])
 
     def get_smart_playlist(self, type):
         tracks = []
         try:
-            albums = makelist(unescapeobj(self.api.getAlbumList(type,5).get('albumList').get('album')))
+            al = self.api.getAlbumList(type, 5).get('albumList').get('album')
+            albums = makelist(unescapeobj(al))
             for album in albums:
                 tracks.extend(self.album_to_tracks(album))
             return Playlist(uri=u'subsonic://%s' % type,
@@ -386,7 +415,8 @@ class SubsonicRemoteClient(object):
 
     def generate_random_playlist(self):
         try:
-            songs = makelist(unescapeobj(self.api.getRandomSongs(100).get('randomSongs').get('song')))
+            rdm = self.api.getRandomSongs(100).get('randomSongs').get('song')
+            songs = makelist(unescapeobj(rdm))
             return Playlist(uri=u'subsonic://randomsongs',
                             name='randomsongs',
                             tracks=[self.get_track(song) for song in songs])
