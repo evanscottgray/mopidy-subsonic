@@ -250,7 +250,7 @@ class SubsonicRemoteClient(object):
             track_kwargs['name'] = data['title']
 
         if 'year' in data:
-            track_kwargs['date'] = data['year']
+            track_kwargs['date'] = str(data['year'])
         else:
             track_kwargs['date'] = 'none'
 
