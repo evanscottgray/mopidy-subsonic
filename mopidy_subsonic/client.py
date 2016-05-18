@@ -203,6 +203,18 @@ class SubsonicRemoteClient(object):
         return tracks
 
     @cache()
+    def get_tracks_by_artist_id(self, artist_id):
+        albums = makelist(self.id_to_albums(artist_id))
+
+        tracks = []
+        for album in albums:
+            album = self.album_to_tracks(album)
+            album = [x for x in album if x is not None]
+            tracks.extend(album)
+
+        return tracks
+
+    @cache()
     def get_song(self, id):
         try:
             song = unescapeobj(self.api.getSong(id).get('song'))

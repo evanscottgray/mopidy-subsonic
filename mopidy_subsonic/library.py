@@ -4,11 +4,14 @@ import logging
 
 from mopidy import backend
 from mopidy.models import SearchResult
+from mopidy_subsonic import browse
 
 logger = logging.getLogger(__name__)
 
 
 class SubsonicLibraryProvider(backend.LibraryProvider):
+
+    root_directory = browse.ROOT_DIR
 
     def __init__(self, *args, **kwargs):
         super(SubsonicLibraryProvider, self).__init__(*args, **kwargs)
@@ -25,6 +28,9 @@ class SubsonicLibraryProvider(backend.LibraryProvider):
             uri='subsonic:tracks',
             tracks=self.remote.get_tracks_by(
                 query.get('artist'), query.get('album')))
+
+    def browse(self, uri):
+        return browse.browse(self.remote, uri)
 
     def search(self, query=None, uris=None, exact=False):
         if exact:
