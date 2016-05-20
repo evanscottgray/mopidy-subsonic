@@ -29,6 +29,9 @@ class SubsonicLibraryProvider(backend.LibraryProvider):
             tracks=self.remote.get_tracks_by(
                 query.get('artist'), query.get('album')))
 
+    def refresh(self):
+        logger.info('REFRESH CALLED YO')
+
     def browse(self, uri):
         return browse.browse(self.remote, uri)
 

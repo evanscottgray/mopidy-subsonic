@@ -15,16 +15,18 @@ _ROOT_DIR_CONTENTS = [
 ]
 
 
-def _get_artist_albums(remote, uri):
-    artist_id = uri.split(':')[2]
+def _artist_to_ref(artist):
+    if artist.name:
+        name = artist.name
+    else:
+        name = 'Unknown artist'
 
-    albums = remote.id_to_albums(artist_id)
-    return albums
+    return models.Ref.directory(uri=artist.uri, name=name)
 
 
 def _album_to_ref(album):
-    name = album.get('title', 'Unknown Album')
-    uri = 'subsonic:album:%s' % album.get('id')
+    uri = album.uri
+    name = album.name
     return models.Ref.directory(uri=uri, name=name)
 
 
@@ -41,36 +43,31 @@ def _track_to_ref(remote, track, with_track_no=False):
     return models.Ref.track(uri=uri, name=name)
 
 
+def _get_artist_albums(remote, uri):
+    albums = remote.get_artist_albums(uri)
+    return albums
+
+
+def _get_album_tracks(remote, uri):
+    tracks = remote.get_album_tracks(uri)
+    return tracks
+
+
 def _get_artist_tracks(remote, uri):
     artist_id = uri.split(':')[2]
     tracks = remote.get_tracks_by_artist_id(artist_id)
     return tracks
 
 
-def _browse_artist_all_tracks(remote, uri):
+def browse_artists(remote):
     refs = []
-    for track in _get_artist_tracks(remote, uri):
-        trackref = _track_to_ref(remote, track)
-        refs.append(trackref)
+    for artist in remote.get_artists():
+        refs.append(_artist_to_ref(artist))
+        refs.sort(key=lambda ref: ref.name)
     return refs
 
 
-def _get_album_tracks(remote, uri):
-    album_id = uri.split(':')[2]
-
-    tracks = remote.id_to_dir(album_id)
-    return tracks
-
-
-def _browse_album(remote, uri):
-    refs = []
-    for track in _get_album_tracks(remote, uri):
-        trackref = _track_to_ref(remote, track, True)
-        refs.append(trackref)
-    return refs
-
-
-def _browse_artist(remote, uri):
+def browse_artist(remote, uri):
         refs = []
         for album in _get_artist_albums(remote, uri):
             refs.append(_album_to_ref(album))
@@ -81,26 +78,22 @@ def _browse_artist(remote, uri):
             return refs
         else:
             # Show all tracks if no album is available
-            return _browse_artist_all_tracks(remote, uri)
+            return browse_artist_all_tracks(remote, uri)
 
 
-def _artist_to_ref(artist):
-    artist_name = next(iter(artist.artists))
-    if artist_name.name:
-        name = artist_name.name
-    else:
-        name = 'Unknown artist'
-
-    artist_id = artist.uri.split('//')[-1]
-    uri = 'subsonic:artist:%s' % artist_id
-    return models.Ref.directory(uri=uri, name=name)
-
-
-def _browse_artists(remote):
+def browse_artist_all_tracks(remote, uri):
     refs = []
-    for artist in remote.get_artists():
-        refs.append(_artist_to_ref(artist))
-        refs.sort(key=lambda ref: ref.name)
+    for track in _get_artist_tracks(remote, uri):
+        trackref = _track_to_ref(remote, track)
+        refs.append(trackref)
+    return refs
+
+
+def browse_album(remote, uri):
+    refs = []
+    for track in _get_album_tracks(remote, uri):
+        trackref = _track_to_ref(remote, track, True)
+        refs.append(trackref)
     return refs
 
 
@@ -113,16 +106,16 @@ def browse(remote, uri):
     if uri == ROOT_DIR.uri:
         return _ROOT_DIR_CONTENTS
     if uri == 'subsonic:artists':
-        return _browse_artists(remote)
+        return browse_artists(remote)
 
     if len(parts) == 3 and parts[1] == 'artist':
-        return _browse_artist(remote, uri)
+        return browse_artist(remote, uri)
 
     if len(parts) == 3 and parts[1] == 'album':
-        return _browse_album(remote, uri)
+        return browse_album(remote, uri)
 
     if len(parts) == 4 and parts[1] == 'artist' and parts[3] == 'all':
-        return _browse_artist_all_tracks(remote, uri)
+        return browse_artist_all_tracks(remote, uri)
 
     if uri == 'subsonic:debug':
         import pdb
