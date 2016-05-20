@@ -108,7 +108,7 @@ def browse(remote, uri):
 
     parts = uri.split(':')
 
-    logger.debug('GOT URI |%s|' % uri)
+    logger.info('GOT URI |%s|' % uri)
 
     if uri == ROOT_DIR.uri:
         return _ROOT_DIR_CONTENTS
@@ -123,3 +123,7 @@ def browse(remote, uri):
 
     if len(parts) == 4 and parts[1] == 'artist' and parts[3] == 'all':
         return _browse_artist_all_tracks(remote, uri)
+
+    if uri == 'subsonic:debug':
+        import pdb
+        pdb.set_trace()

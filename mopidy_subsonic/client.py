@@ -246,6 +246,13 @@ class SubsonicRemoteClient(object):
         track = self._convert_data(data)
         return track
 
+    @cache(ctl=16)
+    def _get_artist(self, data):
+        uri = 'subsonic:artist:' + data['id']
+        name = data.get('name', '')
+        artist = Artist(uri=uri, name=name)
+        return artist
+
     def _convert_data(self, data):
         if not data:
             return
